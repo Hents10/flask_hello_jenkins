@@ -12,5 +12,9 @@ def hello_world():
 def hello_user(username):
     return 'Hello %s!\n' % username
 
+@app.route('/feature/<username>')
+def feature(username):
+    return 'Feature %s!' % username
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
