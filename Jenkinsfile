@@ -37,7 +37,7 @@ spec:
           mountPath: /kaniko/.docker
 
     - name: kubectl
-      image: lachlanevenson/k8s-kubectl:v1.29.2
+      image: bitnami/kubectl:1.29
       command:
         - /bin/sh
       args:
