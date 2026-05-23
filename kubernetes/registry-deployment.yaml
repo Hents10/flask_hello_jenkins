@@ -1,20 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pythontest
+  name: registry
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: pythontest
+      app: registry
   template:
     metadata:
       labels:
-        app: pythontest
+        app: registry
     spec:
       containers:
-        - name: pythontest
-          image: registry:5000/pythontest:latest
+        - name: registry
+          image: registry:2
           ports:
             - containerPort: 5000
-              name: microport

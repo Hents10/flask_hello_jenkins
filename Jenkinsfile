@@ -2,60 +2,49 @@ pipeline {
 
     agent {
         kubernetes {
-
             inheritFrom 'default'
 
             yaml """
 apiVersion: v1
 kind: Pod
-
 metadata:
   labels:
     component: ci
 
 spec:
-
   serviceAccountName: jenkins
 
   containers:
 
     - name: python
       image: python:3.11-slim
-      command:
-        - cat
+      command: ["cat"]
       tty: true
 
     - name: docker
       image: docker:27.0.3-cli
-      command:
-        - cat
+      command: ["cat"]
       tty: true
-
-      env:
-        - name: DOCKER_API_VERSION
-          value: "1.44"
-
       volumeMounts:
         - name: docker-sock
           mountPath: /var/run/docker.sock
 
-        - name: docker-config
-          mountPath: /root/.docker
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      command: ["cat"]
+      tty: true
 
   volumes:
-
     - name: docker-sock
       hostPath:
         path: /var/run/docker.sock
-
-    - name: docker-config
-      emptyDir: {}
 """
         }
     }
 
     environment {
-        IMAGE_NAME = "host.minikube.internal:4000/pythontest:latest"
+        REGISTRY = "registry:5000"
+        IMAGE_NAME = "registry:5000/pythontest:latest"
     }
 
     stages {
@@ -87,26 +76,12 @@ spec:
         stage('Build image') {
             steps {
                 container('docker') {
-
                     sh '''
-                        echo "CONFIGURING DOCKER INSECURE REGISTRY"
-
-                        mkdir -p /root/.docker
-
-                        cat > /root/.docker/config.json <<EOF
-{
-  "insecure-registries": ["host.minikube.internal:4000"]
-}
-EOF
-
-                        echo "CHECK DOCKER"
-                        docker version
-
                         echo "BUILD IMAGE"
-                        docker build -t ${IMAGE_NAME} .
+                        docker build -t registry:5000/pythontest:latest .
 
                         echo "PUSH IMAGE"
-                        docker push ${IMAGE_NAME}
+                        docker push registry:5000/pythontest:latest
 
                         docker images
                     '''
@@ -118,9 +93,11 @@ EOF
             steps {
                 container('kubectl') {
                     sh '''
-                        kubectl version --client
+                        echo "DEPLOY TO KUBERNETES"
+
                         kubectl apply -f kubernetes/deployment.yaml
                         kubectl apply -f kubernetes/service.yaml
+
                         kubectl rollout status deployment/pythontest --timeout=180s
                     '''
                 }
