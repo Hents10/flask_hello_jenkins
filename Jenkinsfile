@@ -22,7 +22,7 @@ spec:
       tty: true
 
     - name: kaniko
-      image: gcr.io/kaniko-project/executor:v1.23.2
+      image: gcr.io/kaniko-project/executor:debug
       command:
         - /busybox/cat
       tty: true
