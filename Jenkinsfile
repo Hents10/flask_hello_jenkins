@@ -30,30 +30,28 @@ spec:
       command:
         - cat
       tty: true
+
       env:
         - name: DOCKER_API_VERSION
           value: "1.44"
+
       volumeMounts:
         - name: docker-sock
           mountPath: /var/run/docker.sock
 
-    - name: kubectl
-      image: bitnami/kubectl:latest
-      command:
-        - cat
-      tty: true
+        - name: docker-config
+          mountPath: /root/.docker
 
   volumes:
 
     - name: docker-sock
       hostPath:
         path: /var/run/docker.sock
+
+    - name: docker-config
+      emptyDir: {}
 """
         }
-    }
-
-    triggers {
-        pollSCM('* * * * *')
     }
 
     environment {
@@ -76,103 +74,78 @@ spec:
 
         stage('Test python') {
             steps {
-
                 container('python') {
-
-                    echo 'TEST PYTHON START'
-
                     sh '''
                         python --version
-
                         pip install --no-cache-dir -r requirements.txt
-
                         python test.py
                     '''
-
-                    echo 'TEST PYTHON END'
                 }
             }
         }
 
         stage('Build image') {
             steps {
-
                 container('docker') {
 
-                    echo 'BUILD IMAGE START'
-
                     sh '''
+                        echo "CONFIGURING DOCKER INSECURE REGISTRY"
+
+                        mkdir -p /root/.docker
+
+                        cat > /root/.docker/config.json <<EOF
+{
+  "insecure-registries": ["host.minikube.internal:4000"]
+}
+EOF
+
+                        echo "CHECK DOCKER"
                         docker version
 
+                        echo "BUILD IMAGE"
                         docker build -t ${IMAGE_NAME} .
 
+                        echo "PUSH IMAGE"
                         docker push ${IMAGE_NAME}
 
                         docker images
                     '''
-
-                    echo 'BUILD IMAGE END'
                 }
             }
         }
 
         stage('Deploy') {
             steps {
-
                 container('kubectl') {
-
-                    echo 'DEPLOY START'
-
                     sh '''
                         kubectl version --client
-
                         kubectl apply -f kubernetes/deployment.yaml
-
                         kubectl apply -f kubernetes/service.yaml
-
                         kubectl rollout status deployment/pythontest --timeout=180s
                     '''
-
-                    echo 'DEPLOY END'
                 }
             }
         }
 
         stage('Verify Deployment') {
             steps {
-
                 container('kubectl') {
-
-                    echo 'VERIFY DEPLOYMENT START'
-
                     sh '''
                         kubectl get pods -o wide
-
                         kubectl get svc
                     '''
-
-                    echo 'VERIFY DEPLOYMENT END'
                 }
-            }
-        }
-
-        stage('End') {
-            steps {
-                echo 'PIPELINE SUCCESS'
             }
         }
     }
 
     post {
-
         success {
             echo 'BUILD SUCCESSFUL'
         }
-
         failure {
             echo 'BUILD FAILED'
         }
-
         always {
             echo 'PIPELINE FINISHED'
         }
