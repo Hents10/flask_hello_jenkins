@@ -24,6 +24,10 @@ spec:
 """
         }
     }
+    
+    triggers {
+        githubPush()
+    }
 
     stages {
 
