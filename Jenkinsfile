@@ -43,8 +43,8 @@ spec:
     }
 
     environment {
-        REGISTRY = "registry:5000"
-        IMAGE_NAME = "registry:5000/pythontest:latest"
+        REGISTRY = "registry.jenkins.svc.cluster.local:5000"
+        IMAGE_NAME = "registry.jenkins.svc.cluster.local:5000/pythontest:latest"
     }
 
     stages {
@@ -78,10 +78,10 @@ spec:
                 container('docker') {
                     sh '''
                         echo "BUILD IMAGE"
-                        docker build -t registry:5000/pythontest:latest .
+                        docker build -t $IMAGE_NAME .
 
                         echo "PUSH IMAGE"
-                        docker push registry:5000/pythontest:latest
+                        docker push $IMAGE_NAME
 
                         docker images
                     '''
