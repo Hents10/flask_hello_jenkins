@@ -23,8 +23,13 @@ spec:
 
     - name: kaniko
       image: gcr.io/kaniko-project/executor:v1.23.2
-      command: ["cat"]
+      command:
+        - sleep
+        - "999999"
       tty: true
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
 
     - name: kubectl
       image: bitnami/kubectl:latest
@@ -32,7 +37,7 @@ spec:
       tty: true
 
   volumes:
-    - name: workspace-volume
+    - name: docker-config
       emptyDir: {}
 """
         }
@@ -69,6 +74,24 @@ spec:
             }
         }
 
+        stage('Prepare Kaniko Auth') {
+            steps {
+                container('kaniko') {
+                    sh '''
+                        mkdir -p /kaniko/.docker
+
+                        cat > /kaniko/.docker/config.json <<EOF
+{
+  "auths": {
+    "${REGISTRY}": {}
+  }
+}
+EOF
+                    '''
+                }
+            }
+        }
+
         stage('Build image (Kaniko)') {
             steps {
                 container('kaniko') {
@@ -78,7 +101,8 @@ spec:
                         --dockerfile $WORKSPACE/Dockerfile \
                         --destination=$IMAGE_NAME \
                         --insecure \
-                        --skip-tls-verify
+                        --skip-tls-verify \
+                        --verbosity=info
                     '''
                 }
             }
@@ -88,18 +112,15 @@ spec:
             steps {
                 container('kubectl') {
                     sh '''
-                        echo "DEPLOY TO KUBERNETES"
-
                         kubectl apply -f kubernetes/deployment.yaml
                         kubectl apply -f kubernetes/service.yaml
-
                         kubectl rollout status deployment/pythontest --timeout=180s
                     '''
                 }
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Verify') {
             steps {
                 container('kubectl') {
                     sh '''
@@ -112,14 +133,8 @@ spec:
     }
 
     post {
-        success {
-            echo 'BUILD SUCCESSFUL'
-        }
-        failure {
-            echo 'BUILD FAILED'
-        }
-        always {
-            echo 'PIPELINE FINISHED'
-        }
+        success { echo 'BUILD SUCCESSFUL' }
+        failure { echo 'BUILD FAILED' }
+        always { echo 'PIPELINE FINISHED' }
     }
 }
