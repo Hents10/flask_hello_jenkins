@@ -26,10 +26,13 @@ spec:
       tty: true
 
     - name: docker
-      image: docker:24-cli
+      image: docker:27.0.3-cli
       command:
         - cat
       tty: true
+      env:
+        - name: DOCKER_API_VERSION
+          value: "1.44"
       volumeMounts:
         - name: docker-sock
           mountPath: /var/run/docker.sock
@@ -80,7 +83,9 @@ spec:
 
                     sh '''
                         python --version
+
                         pip install --no-cache-dir -r requirements.txt
+
                         python test.py
                     '''
 
@@ -101,9 +106,9 @@ spec:
 
                         docker build -t ${IMAGE_NAME} .
 
-                        docker images
-
                         docker push ${IMAGE_NAME}
+
+                        docker images
                     '''
 
                     echo 'BUILD IMAGE END'
@@ -125,7 +130,7 @@ spec:
 
                         kubectl apply -f kubernetes/service.yaml
 
-                        kubectl rollout status deployment/pythontest --timeout=120s
+                        kubectl rollout status deployment/pythontest --timeout=180s
                     '''
 
                     echo 'DEPLOY END'
@@ -141,7 +146,8 @@ spec:
                     echo 'VERIFY DEPLOYMENT START'
 
                     sh '''
-                        kubectl get pods
+                        kubectl get pods -o wide
+
                         kubectl get svc
                     '''
 
