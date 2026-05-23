@@ -13,7 +13,7 @@ metadata:
     component: ci
 
 spec:
-  serviceAccountName: jenkins
+  serviceAccountName: default
 
   containers:
 
@@ -29,7 +29,7 @@ spec:
         - /busybox/sh
       args:
         - -c
-        - "cat"
+        - "sleep 999999"
       tty: true
 
       volumeMounts:
@@ -37,19 +37,19 @@ spec:
           mountPath: /kaniko/.docker
 
     - name: kubectl
-      image: bitnami/kubectl:latest
+      image: lachlanevenson/k8s-kubectl:v1.29.2
       command:
         - /bin/sh
       args:
         - -c
-        - "cat"
+        - "sleep 999999"
       tty: true
 
   volumes:
-    - name: docker-config
+    - name: workspace-volume
       emptyDir: {}
 
-    - name: workspace-volume
+    - name: docker-config
       emptyDir: {}
 """
         }
@@ -96,7 +96,7 @@ spec:
 
                         cat > /kaniko/.docker/config.json <<EOF
 {
-  "insecure-registries": [
+  "insecure-registries" : [
     "registry.jenkins.svc.cluster.local:5000"
   ]
 }
@@ -111,8 +111,8 @@ EOF
                 container('kaniko') {
                     sh '''
                         /kaniko/executor \
-                          --context=$WORKSPACE \
-                          --dockerfile=$WORKSPACE/Dockerfile \
+                          --context $WORKSPACE \
+                          --dockerfile $WORKSPACE/Dockerfile \
                           --destination=$IMAGE_NAME \
                           --insecure \
                           --skip-tls-verify \
@@ -125,11 +125,11 @@ EOF
         stage('Deploy') {
             steps {
                 container('kubectl') {
-                    sh '''
-                        echo "KUBECTL VERSION"
-                        kubectl version --client=true
 
-                        echo "DEPLOYMENT"
+                    sh '''
+                        kubectl version --client
+
+                        echo "DEPLOYMENT START"
 
                         kubectl apply -f kubernetes/deployment.yaml
 
@@ -141,18 +141,16 @@ EOF
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Verify') {
             steps {
                 container('kubectl') {
+
                     sh '''
-                        echo "PODS"
+                        echo "VERIFY DEPLOYMENT"
+
                         kubectl get pods -o wide
 
-                        echo "SERVICES"
                         kubectl get svc
-
-                        echo "DEPLOYMENTS"
-                        kubectl get deployments
                     '''
                 }
             }
