@@ -62,7 +62,7 @@ spec:
             steps {
                 container('kubectl') {
                     sh 'kubectl version --client'
-                    sh 'kubectl apply -f k8s/deployment.yaml'
+                    sh 'kubectl apply -f kubernetes/'
                 }
             }
         }

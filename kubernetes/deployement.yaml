@@ -1,20 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pythontest
+  name: flask-app
+  labels:
+    app: flask-app
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
-      app: pythontest
+      app: flask-app
   template:
     metadata:
       labels:
-        app: pythontest
+        app: flask-app
     spec:
       containers:
-        - name: pythontest
-          image: registry:5000/pythontest:latest
+        - name: flask-app
+          image: registry.jenkins.svc.cluster.local:5000/pythontest:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
-              name: microport
+          env:
+            - name: FLASK_ENV
+              value: "production"
