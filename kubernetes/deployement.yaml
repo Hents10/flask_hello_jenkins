@@ -15,11 +15,11 @@ spec:
         app: flask-app
     spec:
       containers:
-        - name: flask-app
-          image: registry.jenkins.svc.cluster.local:5000/pythontest:latest
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 5000
-          env:
-            - name: FLASK_ENV
-              value: "production"
+          - name: flask-app
+            image: 192.168.49.2:30500/pythontest:latest
+            imagePullPolicy: Always
+            ports:
+              - containerPort: 5000
+            env:
+              - name: FLASK_ENV
+                value: "production"
