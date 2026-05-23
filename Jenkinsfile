@@ -37,7 +37,7 @@ spec:
           mountPath: /kaniko/.docker
 
     - name: kubectl
-      image: bitnami/kubectl:1.29
+      image: rancher/kubectl:v1.29.0
       command:
         - /bin/sh
       args:
@@ -77,6 +77,7 @@ spec:
         stage('Test python') {
             steps {
                 container('python') {
+
                     sh '''
                         python --version
 
@@ -91,6 +92,7 @@ spec:
         stage('Prepare Kaniko Auth') {
             steps {
                 container('kaniko') {
+
                     sh '''
                         mkdir -p /kaniko/.docker
 
@@ -109,6 +111,7 @@ EOF
         stage('Build image (Kaniko)') {
             steps {
                 container('kaniko') {
+
                     sh '''
                         /kaniko/executor \
                           --context $WORKSPACE \
