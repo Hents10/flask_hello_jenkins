@@ -2,6 +2,7 @@ pipeline {
 
     agent {
         kubernetes {
+
             inheritFrom 'default'
 
             yaml """
@@ -26,12 +27,8 @@ spec:
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
       command:
-        - /busybox/sh
-      args:
-        - -c
-        - "sleep 999999"
+        - /busybox/cat
       tty: true
-
       volumeMounts:
         - name: docker-config
           mountPath: /kaniko/.docker
@@ -39,16 +36,12 @@ spec:
     - name: kubectl
       image: rancher/kubectl:v1.29.0
       command:
-        - /bin/sh
+        - sleep
       args:
-        - -c
-        - "sleep 999999"
+        - "999999"
       tty: true
 
   volumes:
-    - name: workspace-volume
-      emptyDir: {}
-
     - name: docker-config
       emptyDir: {}
 """
@@ -56,7 +49,6 @@ spec:
     }
 
     environment {
-        REGISTRY   = "registry.jenkins.svc.cluster.local:5000"
         IMAGE_NAME = "registry.jenkins.svc.cluster.local:5000/pythontest:latest"
     }
 
@@ -77,7 +69,6 @@ spec:
         stage('Test python') {
             steps {
                 container('python') {
-
                     sh '''
                         python --version
 
@@ -92,7 +83,6 @@ spec:
         stage('Prepare Kaniko Auth') {
             steps {
                 container('kaniko') {
-
                     sh '''
                         mkdir -p /kaniko/.docker
 
@@ -111,7 +101,6 @@ EOF
         stage('Build image (Kaniko)') {
             steps {
                 container('kaniko') {
-
                     sh '''
                         /kaniko/executor \
                           --context $WORKSPACE \
@@ -128,17 +117,19 @@ EOF
         stage('Deploy') {
             steps {
                 container('kubectl') {
-
                     sh '''
                         kubectl version --client
 
-                        echo "DEPLOYMENT START"
+                        kubectl delete deployment flask-app --ignore-not-found=true
 
-                        kubectl apply -f kubernetes/deployment.yaml
+                        kubectl create deployment flask-app \
+                          --image=$IMAGE_NAME
 
-                        kubectl apply -f kubernetes/service.yaml
-
-                        kubectl rollout status deployment/pythontest --timeout=180s
+                        kubectl expose deployment flask-app \
+                          --type=NodePort \
+                          --port=5000 \
+                          --target-port=5000 \
+                          --ignore-not-found=true
                     '''
                 }
             }
@@ -147,13 +138,10 @@ EOF
         stage('Verify') {
             steps {
                 container('kubectl') {
-
                     sh '''
-                        echo "VERIFY DEPLOYMENT"
-
-                        kubectl get pods -o wide
-
+                        kubectl get pods
                         kubectl get svc
+                        kubectl get deployment
                     '''
                 }
             }
@@ -162,16 +150,16 @@ EOF
 
     post {
 
+        always {
+            echo 'PIPELINE FINISHED'
+        }
+
         success {
-            echo 'BUILD SUCCESSFUL'
+            echo 'BUILD SUCCESS'
         }
 
         failure {
             echo 'BUILD FAILED'
-        }
-
-        always {
-            echo 'PIPELINE FINISHED'
         }
     }
 }
