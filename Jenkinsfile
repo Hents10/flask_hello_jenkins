@@ -21,13 +21,10 @@ spec:
       command: ["cat"]
       tty: true
 
-    - name: docker
-      image: docker:27.0.3-cli
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:v1.23.2
       command: ["cat"]
       tty: true
-      volumeMounts:
-        - name: docker-sock
-          mountPath: /var/run/docker.sock
 
     - name: kubectl
       image: bitnami/kubectl:latest
@@ -35,9 +32,8 @@ spec:
       tty: true
 
   volumes:
-    - name: docker-sock
-      hostPath:
-        path: /var/run/docker.sock
+    - name: workspace-volume
+      emptyDir: {}
 """
         }
     }
@@ -73,17 +69,16 @@ spec:
             }
         }
 
-        stage('Build image') {
+        stage('Build image (Kaniko)') {
             steps {
-                container('docker') {
+                container('kaniko') {
                     sh '''
-                        echo "BUILD IMAGE"
-                        docker build -t $IMAGE_NAME .
-
-                        echo "PUSH IMAGE"
-                        docker push $IMAGE_NAME
-
-                        docker images
+                        /kaniko/executor \
+                        --context $WORKSPACE \
+                        --dockerfile $WORKSPACE/Dockerfile \
+                        --destination=$IMAGE_NAME \
+                        --insecure \
+                        --skip-tls-verify
                     '''
                 }
             }
