@@ -2,13 +2,11 @@ pipeline {
 
     agent {
         kubernetes {
-
             inheritFrom 'default'
 
             yaml """
 apiVersion: v1
 kind: Pod
-
 metadata:
   labels:
     component: ci
@@ -34,11 +32,9 @@ spec:
           mountPath: /kaniko/.docker
 
     - name: kubectl
-      image: rancher/kubectl:v1.29.0
+      image: dtzar/helm-kubectl:3.14.2
       command:
-        - sleep
-      args:
-        - "999999"
+        - cat
       tty: true
 
   volumes:
@@ -49,14 +45,14 @@ spec:
     }
 
     environment {
-        IMAGE_NAME = "registry.jenkins.svc.cluster.local:5000/pythontest:latest"
+        IMAGE = "registry.jenkins.svc.cluster.local:5000/pythontest:latest"
     }
 
     stages {
 
         stage('Start') {
             steps {
-                echo 'PIPELINE START'
+                echo "PIPELINE START"
             }
         }
 
@@ -66,14 +62,12 @@ spec:
             }
         }
 
-        stage('Test python') {
+        stage('Test Python') {
             steps {
                 container('python') {
                     sh '''
                         python --version
-
                         pip install --no-cache-dir -r requirements.txt
-
                         python test.py
                     '''
                 }
@@ -88,7 +82,7 @@ spec:
 
                         cat > /kaniko/.docker/config.json <<EOF
 {
-  "insecure-registries" : [
+  "insecure-registries": [
     "registry.jenkins.svc.cluster.local:5000"
   ]
 }
@@ -98,18 +92,18 @@ EOF
             }
         }
 
-        stage('Build image (Kaniko)') {
+        stage('Build Image') {
             steps {
                 container('kaniko') {
-                    sh '''
+                    sh """
                         /kaniko/executor \
                           --context $WORKSPACE \
                           --dockerfile $WORKSPACE/Dockerfile \
-                          --destination=$IMAGE_NAME \
+                          --destination=$IMAGE \
                           --insecure \
                           --skip-tls-verify \
                           --verbosity=info
-                    '''
+                    """
                 }
             }
         }
@@ -117,20 +111,20 @@ EOF
         stage('Deploy') {
             steps {
                 container('kubectl') {
-                    sh '''
+                    sh """
                         kubectl version --client
 
                         kubectl delete deployment flask-app --ignore-not-found=true
 
                         kubectl create deployment flask-app \
-                          --image=$IMAGE_NAME
+                          --image=$IMAGE
 
                         kubectl expose deployment flask-app \
                           --type=NodePort \
                           --port=5000 \
                           --target-port=5000 \
                           --ignore-not-found=true
-                    '''
+                    """
                 }
             }
         }
@@ -141,7 +135,7 @@ EOF
                     sh '''
                         kubectl get pods
                         kubectl get svc
-                        kubectl get deployment
+                        kubectl get deployments
                     '''
                 }
             }
@@ -149,17 +143,16 @@ EOF
     }
 
     post {
-
         always {
-            echo 'PIPELINE FINISHED'
+            echo "PIPELINE FINISHED"
         }
 
         success {
-            echo 'BUILD SUCCESS'
+            echo "BUILD SUCCESS"
         }
 
         failure {
-            echo 'BUILD FAILED'
+            echo "BUILD FAILED"
         }
     }
 }
