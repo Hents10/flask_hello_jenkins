@@ -7,6 +7,7 @@ pipeline {
             yaml """
 apiVersion: v1
 kind: Pod
+
 metadata:
   labels:
     component: ci
@@ -18,32 +19,44 @@ spec:
 
     - name: python
       image: python:3.11-slim
-      command: ["cat"]
+      command:
+        - cat
       tty: true
 
     - name: kaniko
       image: gcr.io/kaniko-project/executor:debug
       command:
-        - /busybox/cat
+        - /busybox/sh
+      args:
+        - -c
+        - "cat"
       tty: true
+
       volumeMounts:
         - name: docker-config
           mountPath: /kaniko/.docker
 
     - name: kubectl
       image: bitnami/kubectl:latest
-      command: ["cat"]
+      command:
+        - /bin/sh
+      args:
+        - -c
+        - "cat"
       tty: true
 
   volumes:
     - name: docker-config
+      emptyDir: {}
+
+    - name: workspace-volume
       emptyDir: {}
 """
         }
     }
 
     environment {
-        REGISTRY = "registry.jenkins.svc.cluster.local:5000"
+        REGISTRY   = "registry.jenkins.svc.cluster.local:5000"
         IMAGE_NAME = "registry.jenkins.svc.cluster.local:5000/pythontest:latest"
     }
 
@@ -66,7 +79,9 @@ spec:
                 container('python') {
                     sh '''
                         python --version
+
                         pip install --no-cache-dir -r requirements.txt
+
                         python test.py
                     '''
                 }
@@ -81,9 +96,9 @@ spec:
 
                         cat > /kaniko/.docker/config.json <<EOF
 {
-  "auths": {
-    "${REGISTRY}": {}
-  }
+  "insecure-registries": [
+    "registry.jenkins.svc.cluster.local:5000"
+  ]
 }
 EOF
                     '''
@@ -96,12 +111,12 @@ EOF
                 container('kaniko') {
                     sh '''
                         /kaniko/executor \
-                        --context $WORKSPACE \
-                        --dockerfile $WORKSPACE/Dockerfile \
-                        --destination=$IMAGE_NAME \
-                        --insecure \
-                        --skip-tls-verify \
-                        --verbosity=info
+                          --context=$WORKSPACE \
+                          --dockerfile=$WORKSPACE/Dockerfile \
+                          --destination=$IMAGE_NAME \
+                          --insecure \
+                          --skip-tls-verify \
+                          --verbosity=info
                     '''
                 }
             }
@@ -111,20 +126,33 @@ EOF
             steps {
                 container('kubectl') {
                     sh '''
+                        echo "KUBECTL VERSION"
+                        kubectl version --client=true
+
+                        echo "DEPLOYMENT"
+
                         kubectl apply -f kubernetes/deployment.yaml
+
                         kubectl apply -f kubernetes/service.yaml
+
                         kubectl rollout status deployment/pythontest --timeout=180s
                     '''
                 }
             }
         }
 
-        stage('Verify') {
+        stage('Verify Deployment') {
             steps {
                 container('kubectl') {
                     sh '''
+                        echo "PODS"
                         kubectl get pods -o wide
+
+                        echo "SERVICES"
                         kubectl get svc
+
+                        echo "DEPLOYMENTS"
+                        kubectl get deployments
                     '''
                 }
             }
@@ -132,8 +160,17 @@ EOF
     }
 
     post {
-        success { echo 'BUILD SUCCESSFUL' }
-        failure { echo 'BUILD FAILED' }
-        always { echo 'PIPELINE FINISHED' }
+
+        success {
+            echo 'BUILD SUCCESSFUL'
+        }
+
+        failure {
+            echo 'BUILD FAILED'
+        }
+
+        always {
+            echo 'PIPELINE FINISHED'
+        }
     }
 }
